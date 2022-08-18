@@ -7,7 +7,7 @@
     </div>
 
     <div style="display: flex">
-      <div style="width: 500px">
+      <div style="width: 300px">
         <editor-content class="editor-content" :editor="editor" />
       </div>
 
@@ -21,15 +21,15 @@
 <script>
 // comment / 协作
 import { Editor, EditorContent } from "@tiptap/vue-2";
-import Document from "@tiptap/extension-document";
-import Paragraph from "@tiptap/extension-paragraph";
-import Text from "@tiptap/extension-text";
-import Heading from "@tiptap/extension-heading"; // 标题
-import Bold from "@tiptap/extension-bold"; // 粗体
-import Italic from "@tiptap/extension-italic"; // 斜体
-import Strike from "@tiptap/extension-strike"; // 删除线
-import Blockquote from "@tiptap/extension-blockquote"; // 引用
-import UniqueID from "@tiptap/extension-unique-id"; // 唯一 id
+import StarterKit from '@tiptap/starter-kit'
+
+import Collaboration from "@tiptap/extension-collaboration";
+import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
+
+import { HocuspocusProvider } from "@hocuspocus/provider";
+import { TiptapTransformer } from "@hocuspocus/transformer";
+import { IndexeddbPersistence } from "y-indexeddb";
+import * as Y from "yjs";
 
 export default {
   components: {
@@ -38,63 +38,72 @@ export default {
   data() {
     return {
       editor: null,
-      content: {
-        type: "doc",
-        content: [
-          {
-            type: "paragraph",
-            content: [{ type: "text", text: "2.海边 傍晚 外" }],
-          },
-          {
-            type: "paragraph",
-            content: [{ type: "text", text: "人：孩童若干" }],
-          },
-          {
-            type: "paragraph",
-            content: [
-              {
-                type: "text",
-                text: "△镜头随着飞翔的海鸟掠过海面直至岸边，落在一群嬉闹的孩童身上。落日余晖下，尽是一片安逸之景。",
-              },
-            ],
-          },
-          {
-            type: "paragraph",
-            content: [
-              { type: "text", text: "△特写，一只缓慢爬行的螃蟹入画，被一幼童" },
-              {
-                type: "text",
-                marks: [{ type: "bold" }],
-                text: "捉住，幼童拿起螃蟹想向伙伴",
-              },
-              { type: "text", text: "炫耀，但刚一回头，脸上的笑容凝固。" },
-            ],
-          },
-          {
-            type: "paragraph",
-            content: [
-              {
-                type: "text",
-                text: "△幼童的瞳孔中映射出红色惊涛骇浪，顺着孩童的目光，我们看到辽阔浩渺的海面上掀起红色巨浪向陆地奔赴而来，巨浪燃着赤焰，所到之处皆成一片火海。",
-              },
-            ],
-          },
-          {
-            type: "paragraph",
-            content: [
-              {
-                type: "text",
-                text: "△海中无数生物被冥海吞没，海面骤然跃起一庞然大物，竟是一燃烧的鲸鱼，顷刻间便被烧成灰烬。空中海鸟也无一幸免，群鸟燃烧，发出凄惨鸣叫，纷纷坠入冥海。",
-              },
-            ],
-          },
-        ],
-      },
+      content: null,
+      provider: null,
+      indexdbProvider: null,
+      extensions: [],
     };
   },
+  created() {
+    this.extensions = [
+      StarterKit.configure({
+        history: false
+      })
+    ];
+  },
   mounted() {
+    let name, password, room, token;
+
+    try {
+      let search = {};
+      location.search
+        .replace("?", "")
+        .split("&")
+        .map((item) => {
+          let a = item.split("=");
+          search[a[0]] = a[1];
+        });
+      ({ name, password, room, token } = search);
+    } catch (e) {
+      console.log(e);
+    }
+
+    // console.log(name, password, room);
+
+    // if (!name || !password || !room) return;
+
+    const docName = "default";
+
+    let transformer = TiptapTransformer
+    transformer.extensions(this.extensions);
+    const ydoc = new Y.Doc();
+
+    this.provider = new HocuspocusProvider({
+      url: "ws://10.2.129.78:4444",
+      name: docName,
+      document: ydoc,
+      token: "super-secret-token",
+      broadcast: false,
+      parameters: {
+        name,
+        password,
+        room,
+        token,
+      },
+      onAuthenticated() {
+        console.log("auth success");
+        this.indexdbProvider = new IndexeddbPersistence(docName, ydoc);
+
+        this.indexdbProvider.on("synced", () => {
+          console.log("content from the database is loaded");
+        });
+      },
+      onAuthenticationFailed(params) {
+        console.log("auth failed", params);
+      },
+    });
+
     this.editor = new Editor({
-      content: this.content,
       editorProps: {
         attributes: {},
       },
@@ -102,26 +111,31 @@ export default {
         preserveWhitespace: "full",
       },
       extensions: [
-        Document,
-        Paragraph,
-        Text,
-        Bold,
-        Italic,
-        Strike,
-        Blockquote,
-        UniqueID,
-        Heading.configure({
-          levels: [1, 2, 3],
+        ...this.extensions,
+        Collaboration.configure({
+          document: this.provider.document,
+        }),
+        CollaborationCursor.configure({
+          provider: this.provider,
+          user: {
+            name: name,
+            color: "#f783ac",
+          },
         }),
       ],
-      onUpdate: () => {},
       autofocus: false,
       editable: true,
       injectCSS: false,
     });
+
+    window.editorInstance = this.editor;
+    window.indexedDBProvide = this.indexdbProvider;
+    window.ydoc = ydoc;
   },
   beforeDestroy() {
-    this.editor.destroy();
+    this.editor && this.editor.destroy();
+    this.provider && this.provider.destroy();
+    this.indexdbProvider && this.indexdbProvider.destroy();
   },
   methods: {
     handleSetEditable() {
@@ -169,32 +183,61 @@ export default {
 .options button {
   margin-left: 8px;
 }
+.editor-content {
+  width: 100%;
+}
 .editor-content .ProseMirror {
   border: 1px solid #000;
   outline: none;
   font-size: 14px;
-  min-height: 100%;
-  width: 500px;
+  min-height: 100px;
   max-height: 500px;
   overflow: scroll;
   padding: 6px 8px;
   white-space: pre-wrap;
 }
-.is-active {
-  color: red;
+.editor-content .ProseMirror::-webkit-scrollbar {
+  display: none;
 }
 
-.head {
-  background: rgb(247, 151, 27);
+/* Give a remote user a caret */
+.collaboration-cursor__caret {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 1px solid #0d0d0d;
+  border-right: 1px solid #0d0d0d;
+  word-break: normal;
+  pointer-events: none;
+}
+
+/* Render the username above the caret */
+.collaboration-cursor__label {
+  position: absolute;
+  top: -1.4em;
+  left: -1px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  user-select: none;
+  color: #0d0d0d;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px 3px 3px 0;
+  white-space: nowrap;
 }
 
 #format-json pre {
   outline: 1px solid;
   padding: 5px;
-  width: 500px;
+  width: 40vw;
   margin-left: 50px;
   max-height: 500px;
   overflow: scroll;
+}
+
+#format-json pre::-webkit-scrollbar {
+  display: none;
 }
 
 .json-string {
