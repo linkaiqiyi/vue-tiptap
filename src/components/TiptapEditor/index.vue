@@ -1,7 +1,7 @@
 <template>
   <div class="container">
     <div class="options">
-      <button @click="handleSetEditable">
+      <button @click="() => editor?.setEditable(!editor?.isEditable)">
         editable: {{ editor?.isEditable }}
       </button>
     </div>
@@ -21,7 +21,7 @@
 <script>
 // comment / 协作
 import { Editor, EditorContent } from "@tiptap/vue-2";
-import StarterKit from '@tiptap/starter-kit'
+import StarterKit from "@tiptap/starter-kit";
 
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
@@ -47,8 +47,8 @@ export default {
   created() {
     this.extensions = [
       StarterKit.configure({
-        history: false
-      })
+        history: false,
+      }),
     ];
   },
   mounted() {
@@ -74,12 +74,13 @@ export default {
 
     const docName = "default";
 
-    let transformer = TiptapTransformer
+    let transformer = TiptapTransformer;
     transformer.extensions(this.extensions);
     const ydoc = new Y.Doc();
+    ydoc.transformer = transformer
 
     this.provider = new HocuspocusProvider({
-      url: "ws://10.2.129.78:4444",
+      url: "ws://10.2.129.119:4444",
       name: docName,
       document: ydoc,
       token: "super-secret-token",
@@ -94,12 +95,16 @@ export default {
         console.log("auth success");
         this.indexdbProvider = new IndexeddbPersistence(docName, ydoc);
 
-        this.indexdbProvider.on("synced", () => {
-          console.log("content from the database is loaded");
+        this.indexdbProvider.on("synced", (_this) => {
+          console.log("content from the database is loaded", transformer.fromYdoc(_this.doc));
         });
       },
       onAuthenticationFailed(params) {
         console.log("auth failed", params);
+      },
+      onDisconnect() {
+        console.log('disconnect');
+        this.provider && this.provider.destroy();
       },
     });
 
@@ -139,8 +144,7 @@ export default {
   },
   methods: {
     handleSetEditable() {
-      let editable = this.editor.isEditable;
-      this.editor.setEditable(!editable);
+      this.editor.setEditable(!this.editor.isEditable);
     },
     syntaxHighlight(json) {
       if (typeof json !== "string") {
