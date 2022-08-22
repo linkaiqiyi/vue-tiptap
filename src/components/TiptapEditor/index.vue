@@ -6,13 +6,41 @@
       </button>
     </div>
 
+    <BubbleMenu
+      v-if="editor"
+      :editor="editor"
+      :should-show="
+        ({ editor }) =>
+          !editor.state.selection.empty || editor.isActive('comment')
+      "
+      class="bubble-menu"
+    >
+      <textarea
+        v-model="commentText"
+        cols="30"
+        rows="4"
+        placeholder="Add new comment..."
+        @keypress.enter.stop.prevent="() => setComment()"
+      />
+      <section class="flex justify-end gap-2">
+        <button @click="() => (commentText = '')">Clear</button>
+        <button @click="() => deleteComment()">Delete</button>
+        <button @click="() => setComment()">Add &nbsp; <kbd> ⏎ </kbd></button>
+        <button @click="() => editor.chain().setBold().run()">Bold</button>
+      </section>
+    </BubbleMenu>
+
     <div style="display: flex">
-      <div style="width: 300px">
+      <div style="width: 500px">
         <editor-content class="editor-content" :editor="editor" />
       </div>
 
       <div id="format-json">
-        <pre v-html="syntaxHighlight(editor?.getJSON() || null)"></pre>
+        <pre
+          style="height: 50%"
+          v-html="syntaxHighlight(editor?.getJSON() || null)"
+        ></pre>
+        <pre v-html="syntaxHighlight(activeCommentsInstance || null)"></pre>
       </div>
     </div>
   </div>
@@ -20,20 +48,24 @@
 
 <script>
 // comment / 协作
-import { Editor, EditorContent } from "@tiptap/vue-2";
+import { Editor, EditorContent, BubbleMenu } from "@tiptap/vue-2";
 import StarterKit from "@tiptap/starter-kit";
 
-import Collaboration from "@tiptap/extension-collaboration";
+import { UniqueID, Comment } from "../../extensions/index.js";
+
+import Collaboration, { isChangeOrigin } from "@tiptap/extension-collaboration";
 import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
 
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { TiptapTransformer } from "@hocuspocus/transformer";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
+import { uuidv4 } from "lib0/random.js";
 
 export default {
   components: {
     EditorContent,
+    BubbleMenu,
   },
   data() {
     return {
@@ -41,13 +73,28 @@ export default {
       content: null,
       provider: null,
       indexdbProvider: null,
+      userInfo: {
+        name: "",
+        password: "",
+        room: "",
+        token: "",
+      },
       extensions: [],
+      commentText: "",
+      activeCommentsInstance: {},
+      showCommentMenu: false,
+      showAddCommentSection: false,
+      isTextSelected: false,
+      allComments: [],
     };
   },
   created() {
     this.extensions = [
       StarterKit.configure({
         history: false,
+      }),
+      Comment.configure({
+        isCommentModeOn: () => true
       }),
     ];
   },
@@ -64,46 +111,50 @@ export default {
           search[a[0]] = a[1];
         });
       ({ name, password, room, token } = search);
-    } catch (e) {
-      console.log(e);
-    }
-
-    // console.log(name, password, room);
-
-    // if (!name || !password || !room) return;
-
-    const docName = "default";
-
-    let transformer = TiptapTransformer;
-    transformer.extensions(this.extensions);
-    const ydoc = new Y.Doc();
-    ydoc.transformer = transformer
-
-    this.provider = new HocuspocusProvider({
-      url: "ws://10.2.129.119:4444",
-      name: docName,
-      document: ydoc,
-      token: "super-secret-token",
-      broadcast: false,
-      parameters: {
+      this.userInfo = {
         name,
         password,
         room,
         token,
-      },
+      };
+    } catch (e) {
+      console.log(e);
+    }
+    const docName = "default";
+
+    let transformer = TiptapTransformer;
+    transformer.extensions(this.extensions);
+
+    const ydoc = new Y.Doc();
+    ydoc.transformer = transformer;
+
+    this.indexdbProvider = new IndexeddbPersistence(docName, ydoc);
+
+    this.indexdbProvider.on("synced", (_this) => {
+      console.log(
+        "content from the database is loaded",
+        transformer.fromYdoc(_this.doc)
+      );
+    });
+
+    this.provider = new HocuspocusProvider({
+      url: "ws://10.2.128.251:4444",
+      name: docName,
+      document: ydoc,
+      token: "super-secret-token",
+      broadcast: false,
+      parameters: this.userInfo,
       onAuthenticated() {
         console.log("auth success");
-        this.indexdbProvider = new IndexeddbPersistence(docName, ydoc);
-
-        this.indexdbProvider.on("synced", (_this) => {
-          console.log("content from the database is loaded", transformer.fromYdoc(_this.doc));
-        });
       },
       onAuthenticationFailed(params) {
         console.log("auth failed", params);
       },
+      onConnect() {
+        console.log("connect");
+      },
       onDisconnect() {
-        console.log('disconnect');
+        console.log("disconnect");
         this.provider && this.provider.destroy();
       },
     });
@@ -117,6 +168,11 @@ export default {
       },
       extensions: [
         ...this.extensions,
+        UniqueID.configure({
+          attributeName: "uid",
+          types: ["heading", "paragraph", "comment"],
+          filterTransaction: (transaction) => !isChangeOrigin(transaction),
+        }),
         Collaboration.configure({
           document: this.provider.document,
         }),
@@ -131,6 +187,16 @@ export default {
       autofocus: false,
       editable: true,
       injectCSS: false,
+      onUpdate: ({ editor }) => {
+        this.setCurrentComment(editor);
+      },
+      onSelectionUpdate: ({ editor }) => {
+        this.setCurrentComment(editor);
+        this.isTextSelected = !!editor.state.selection.content().size;
+      },
+      onCreate: ({ editor }) => {
+        this.findCommentsAndStoreValues(editor);
+      },
     });
 
     window.editorInstance = this.editor;
@@ -143,6 +209,106 @@ export default {
     this.indexdbProvider && this.indexdbProvider.destroy();
   },
   methods: {
+    findCommentsAndStoreValues(editorInstance) {
+      const editor = editorInstance || this.editor;
+
+      const tempComments = [];
+
+      editor.state.doc.descendants((node, pos) => {
+        const { marks } = node;
+
+        let pastCommentUuid = "";
+        marks.forEach((mark) => {
+          if (mark.type.name === "comment") {
+            const markComments = mark.attrs.comment;
+
+            const jsonComments = markComments ? JSON.parse(markComments) : null;
+
+            if (
+              jsonComments !== null &&
+              pastCommentUuid !== jsonComments.uuid
+            ) {
+              pastCommentUuid = jsonComments.uuid;
+              tempComments.push({
+                node,
+                jsonComments,
+                from: pos,
+                to: pos + (node.text?.length || 0),
+                text: node.text,
+              });
+            }
+          }
+        });
+
+        this.allComments.splice(0, this.allComments.length, ...tempComments);
+      });
+    },
+    setCurrentComment(editorInstance) {
+      const editor = editorInstance || this.editor;
+      if (editor.isActive("comment")) {
+        setTimeout(() => (this.showCommentMenu = true), 50);
+        this.showAddCommentSection = !editor.state.selection.empty;
+        const parsedComment = JSON.parse(
+          editor.getAttributes("comment").comment
+        );
+        parsedComment.comments =
+          typeof parsedComment.comments === "string"
+            ? JSON.parse(parsedComment.comments)
+            : parsedComment.comments;
+        this.activeCommentsInstance = parsedComment;
+      } else {
+        setTimeout(() => (this.showCommentMenu = false), 50);
+        this.activeCommentsInstance = {};
+      }
+    },
+    deleteComment() {
+      this.editor.chain().unsetComment().run()
+    },
+    setComment(value) {
+      const localVal = value || this.commentText;
+
+      if (!localVal.trim().length) return;
+
+      const activeCommentsInstance = JSON.parse(
+        JSON.stringify(this.activeCommentsInstance)
+      );
+
+      const commentsArray =
+        typeof activeCommentsInstance.comments === "string"
+          ? JSON.parse(activeCommentsInstance.comments)
+          : activeCommentsInstance.comments;
+
+      if (commentsArray) {
+        commentsArray.push({
+          userName: this.userInfo.name,
+          time: Date.now(),
+          content: localVal,
+        });
+
+        const commentWithUuid = JSON.stringify({
+          uuid: activeCommentsInstance.uuid || uuidv4(),
+          comments: commentsArray,
+        });
+
+        this.editor.chain().setComment(commentWithUuid).run();
+      } else {
+        const commentWithUuid = JSON.stringify({
+          uuid: uuidv4(),
+          comments: [
+            {
+              userName: this.userInfo.name,
+              time: Date.now(),
+              content: localVal,
+            },
+          ],
+        });
+        this.editor.chain().setComment(commentWithUuid).run();
+      }
+
+      setTimeout(() => {
+        this.commentText = "";
+      }, 50);
+    },
     handleSetEditable() {
       this.editor.setEditable(!this.editor.isEditable);
     },
@@ -176,6 +342,15 @@ export default {
 };
 </script>
 
+<style scoped>
+.bubble-menu {
+  border: 1px dashed gray;
+  backdrop-filter: blur(16px);
+  padding: 8px;
+  border-radius: 8px;
+}
+</style>
+
 <style>
 .container {
   margin: 16px;
@@ -200,6 +375,14 @@ export default {
   padding: 6px 8px;
   white-space: pre-wrap;
 }
+.editor-content .ProseMirror span[data-comment] {
+  background: rgba(250, 250, 0, 0.25);
+  border-bottom: 2px rgb(255, 183, 0) solid;
+  user-select: all;
+  padding: 0 2px 0 2px;
+  border-radius: 4px;
+}
+
 .editor-content .ProseMirror::-webkit-scrollbar {
   display: none;
 }
@@ -236,7 +419,7 @@ export default {
   padding: 5px;
   width: 40vw;
   margin-left: 50px;
-  max-height: 500px;
+  max-height: 250px;
   overflow: scroll;
 }
 
