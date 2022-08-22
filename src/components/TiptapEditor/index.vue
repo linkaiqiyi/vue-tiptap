@@ -4,6 +4,8 @@
       <button @click="() => editor?.setEditable(!editor?.isEditable)">
         editable: {{ editor?.isEditable }}
       </button>
+      <button @click="() => editor.chain().toggleBold().run()">Bold</button>
+      <button @click="() => editor.chain().toggleHeading({level: 3}).run()">head</button>
     </div>
 
     <BubbleMenu
@@ -26,7 +28,6 @@
         <button @click="() => (commentText = '')">Clear</button>
         <button @click="() => deleteComment()">Delete</button>
         <button @click="() => setComment()">Add &nbsp; <kbd> ⏎ </kbd></button>
-        <button @click="() => editor.chain().setBold().run()">Bold</button>
       </section>
     </BubbleMenu>
 
@@ -51,10 +52,11 @@
 import { Editor, EditorContent, BubbleMenu } from "@tiptap/vue-2";
 import StarterKit from "@tiptap/starter-kit";
 
-import { UniqueID, Comment } from "../../extensions/index.js";
+import { UniqueID, Comment, CustomCursor } from "../../extensions/index.js";
 
 import Collaboration, { isChangeOrigin } from "@tiptap/extension-collaboration";
 import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
+// import Focus from "@tiptap/extension-focus";
 
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { TiptapTransformer } from "@hocuspocus/transformer";
@@ -94,7 +96,7 @@ export default {
         history: false,
       }),
       Comment.configure({
-        isCommentModeOn: () => true
+        isCommentModeOn: () => true,
       }),
     ];
   },
@@ -183,9 +185,12 @@ export default {
             color: "#f783ac",
           },
         }),
+        CustomCursor.configure({
+          className: "has-focus",
+        }),
       ],
       autofocus: false,
-      editable: true,
+      editable: false,
       injectCSS: false,
       onUpdate: ({ editor }) => {
         this.setCurrentComment(editor);
@@ -262,7 +267,7 @@ export default {
       }
     },
     deleteComment() {
-      this.editor.chain().unsetComment().run()
+      this.editor.chain().unsetComment().run();
     },
     setComment(value) {
       const localVal = value || this.commentText;
@@ -381,10 +386,16 @@ export default {
   user-select: all;
   padding: 0 2px 0 2px;
   border-radius: 4px;
+  cursor: pointer;
 }
 
 .editor-content .ProseMirror::-webkit-scrollbar {
   display: none;
+}
+
+.has-focus {
+  border-radius: 3px;
+  box-shadow: 0 0 0 3px #68cef8;
 }
 
 /* Give a remote user a caret */
