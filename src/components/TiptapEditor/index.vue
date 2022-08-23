@@ -5,7 +5,9 @@
         editable: {{ editor?.isEditable }}
       </button>
       <button @click="() => editor.chain().toggleBold().run()">Bold</button>
-      <button @click="() => editor.chain().toggleHeading({level: 3}).run()">head</button>
+      <button @click="() => editor.chain().toggleHeading({ level: 3 }).run()">
+        head
+      </button>
     </div>
 
     <BubbleMenu
@@ -17,17 +19,34 @@
       "
       class="bubble-menu"
     >
+      <div style="margin-bottom: 10px; font-size: 10px">
+        <label
+          style="display: block"
+          v-for="item in activeCommentsInstance"
+          :key="item.uuid"
+        >
+          <input
+            type="radio"
+            v-model="selectedCommentUuid"
+            :value="item.uuid"
+          />
+          {{ item.uuid }}
+        </label>
+      </div>
+      <hr />
       <textarea
         v-model="commentText"
         cols="30"
         rows="4"
         placeholder="Add new comment..."
-        @keypress.enter.stop.prevent="() => setComment()"
+        @keypress.enter.stop.prevent="() => handleSetComment()"
       />
       <section class="flex justify-end gap-2">
         <button @click="() => (commentText = '')">Clear</button>
         <button @click="() => deleteComment()">Delete</button>
-        <button @click="() => setComment()">Add &nbsp; <kbd> ⏎ </kbd></button>
+        <button @click="() => handleSetComment()">
+          Add &nbsp; <kbd> ⏎ </kbd>
+        </button>
       </section>
     </BubbleMenu>
 
@@ -51,9 +70,7 @@
 // comment / 协作
 import { Editor, EditorContent, BubbleMenu } from "@tiptap/vue-2";
 import StarterKit from "@tiptap/starter-kit";
-
-import { UniqueID, Comment, CustomCursor } from "../../extensions/index.js";
-
+// import { findChildrenInRange } from "@tiptap/core";
 import Collaboration, { isChangeOrigin } from "@tiptap/extension-collaboration";
 import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
 // import Focus from "@tiptap/extension-focus";
@@ -62,7 +79,10 @@ import { HocuspocusProvider } from "@hocuspocus/provider";
 import { TiptapTransformer } from "@hocuspocus/transformer";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
+
 import { uuidv4 } from "lib0/random.js";
+
+import { UniqueID, Comment, CustomCursor } from "../../extensions/index.js";
 
 export default {
   components: {
@@ -83,21 +103,27 @@ export default {
       },
       extensions: [],
       commentText: "",
-      activeCommentsInstance: {},
+      selectedCommentUuid: "",
+      activeCommentsInstance: [],
       showCommentMenu: false,
       showAddCommentSection: false,
       isTextSelected: false,
       allComments: [],
     };
   },
+  watch: {
+    showCommentMenu(val) {
+      if (!val) {
+        this.selectedCommentUuid = "";
+      }
+    },
+  },
   created() {
     this.extensions = [
       StarterKit.configure({
         history: false,
       }),
-      Comment.configure({
-        isCommentModeOn: () => true,
-      }),
+      Comment,
     ];
   },
   mounted() {
@@ -199,14 +225,15 @@ export default {
         this.setCurrentComment(editor);
         this.isTextSelected = !!editor.state.selection.content().size;
       },
-      onCreate: ({ editor }) => {
-        this.findCommentsAndStoreValues(editor);
-      },
+      // onCreate: ({ editor }) => {
+      //   this.findCommentsAndStoreValues(editor);
+      // },
     });
 
     window.editorInstance = this.editor;
     window.indexedDBProvide = this.indexdbProvider;
     window.ydoc = ydoc;
+    window.deleteComment = this.deleteComment;
   },
   beforeDestroy() {
     this.editor && this.editor.destroy();
@@ -253,62 +280,63 @@ export default {
       if (editor.isActive("comment")) {
         setTimeout(() => (this.showCommentMenu = true), 50);
         this.showAddCommentSection = !editor.state.selection.empty;
-        const parsedComment = JSON.parse(
-          editor.getAttributes("comment").comment
-        );
-        parsedComment.comments =
-          typeof parsedComment.comments === "string"
-            ? JSON.parse(parsedComment.comments)
-            : parsedComment.comments;
-        this.activeCommentsInstance = parsedComment;
+        let parsedComment = JSON.parse(editor.getAttributes("comment").comment);
+
+        if (parsedComment && Array.isArray(parsedComment)) {
+          this.activeCommentsInstance = parsedComment;
+          this.selectedCommentUuid = this.activeCommentsInstance[0].uuid;
+        }
       } else {
         setTimeout(() => (this.showCommentMenu = false), 50);
-        this.activeCommentsInstance = {};
+        this.activeCommentsInstance = [];
+        this.selectedCommentUuid = "";
       }
     },
-    deleteComment() {
-      this.editor.chain().unsetComment().run();
+    deleteComment(uuid = this.selectedCommentUuid, parentUuid = "") {
+      this.editor.chain().deleteComment({ uuid, parentUuid }).run();
     },
+    handleSetComment() {
+      this.setComment();
+    },
+    /**
+     * 在这个方法中不考虑如何进行 comment 的添加和合并
+     * 只考虑生成 本次新增的 comment 结构 和 传递一个 uuid，传到 mergeComment 命令中进行合并
+     * uuid: 如果有选中的 uuid 则表示是在已有的 comment 下进行追加，传选中的uuid
+     *       如果没有选中的 uuid 则表示为新增 comment，使用 uuidv4 生成一个 uuid，并设置 isAdd 为 true 表示当前为新增
+     */
     setComment(value) {
+      /**
+       * comment 数据结构
+      [
+        {
+          uuid,
+          comments: [
+            {
+              uuid, content, userName, time
+            }
+          ]
+        }
+      ]
+       */
       const localVal = value || this.commentText;
 
       if (!localVal.trim().length) return;
 
-      const activeCommentsInstance = JSON.parse(
-        JSON.stringify(this.activeCommentsInstance)
-      );
+      const commentInfo = {
+        uuid: uuidv4(),
+        userName: this.userInfo.name,
+        time: Date.now(),
+        content: localVal,
+      };
 
-      const commentsArray =
-        typeof activeCommentsInstance.comments === "string"
-          ? JSON.parse(activeCommentsInstance.comments)
-          : activeCommentsInstance.comments;
-
-      if (commentsArray) {
-        commentsArray.push({
-          userName: this.userInfo.name,
-          time: Date.now(),
-          content: localVal,
-        });
-
-        const commentWithUuid = JSON.stringify({
-          uuid: activeCommentsInstance.uuid || uuidv4(),
-          comments: commentsArray,
-        });
-
-        this.editor.chain().setComment(commentWithUuid).run();
-      } else {
-        const commentWithUuid = JSON.stringify({
-          uuid: uuidv4(),
-          comments: [
-            {
-              userName: this.userInfo.name,
-              time: Date.now(),
-              content: localVal,
-            },
-          ],
-        });
-        this.editor.chain().setComment(commentWithUuid).run();
-      }
+      this.editor
+        .chain()
+        .mergeComment({
+          comment: commentInfo,
+          uuid: this.selectedCommentUuid || uuidv4(),
+          isAdd: !this.selectedCommentUuid,
+        })
+        .run();
 
       setTimeout(() => {
         this.commentText = "";

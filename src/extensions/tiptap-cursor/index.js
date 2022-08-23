@@ -6,7 +6,10 @@ const CustomCursorKey = "custom-cursor";
 
 const createCursor = () => {
   const cursor = document.createElement("span");
-  cursor.setAttribute("style", `border-right: 1px solid #000; margin-right: -1px; position: relative; word-break: normal; pointer-events: none;`);
+  cursor.setAttribute(
+    "style",
+    `border-right: 1px solid #000; margin-right: -1px; position: relative; word-break: normal; pointer-events: none;`
+  );
   return cursor;
 };
 

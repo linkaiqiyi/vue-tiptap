@@ -5,6 +5,7 @@ import {
   mergeAttributes,
 } from "@tiptap/vue-2";
 import { Plugin, TextSelection } from "prosemirror-state";
+import { getMarkType } from "@tiptap/core";
 
 const Comment = Mark.create({
   name: "comment",
@@ -45,14 +46,154 @@ const Comment = Mark.create({
 
   addCommands() {
     return {
-      setComment:
-        (comment) =>
-        ({ commands }) =>
-          commands.setMark("comment", { comment }),
-      toggleComment:
-        () =>
-        ({ commands }) =>
-          commands.toggleMark("comment"),
+      mergeComment: ({ comment, uuid, isAdd }) => {
+        return (params) => {
+          const {
+            tr,
+            state: {
+              doc,
+              selection: { from, to },
+            },
+            state,
+          } = params;
+
+          let type = getMarkType("comment", state.schema);
+
+          if (isAdd) {
+            doc.nodesBetween(from, to, (node, pos) => {
+              if (node.isText) {
+                const trimmedFrom = Math.max(pos, from);
+                const trimmedTo = Math.min(pos + node.nodeSize, to);
+                const someHasMark = node.marks.find(
+                  (mark) => mark.type === type
+                );
+                if (!someHasMark) {
+                  tr.addMark(
+                    trimmedFrom,
+                    trimmedTo,
+                    type.create({
+                      comment: JSON.stringify([{ uuid, comments: [comment] }]),
+                    })
+                  );
+                } else {
+                  let oldAttrs = JSON.parse(someHasMark.attrs.comment);
+                  if (Array.isArray(oldAttrs)) {
+                    let targetComment = oldAttrs.find((v) => v.uuid === uuid);
+
+                    if (targetComment) {
+                      targetComment.comments.push(comment);
+                    } else {
+                      oldAttrs.push({ uuid, comments: [comment] });
+                    }
+                    tr.addMark(
+                      trimmedFrom,
+                      trimmedTo,
+                      type.create({ comment: JSON.stringify(oldAttrs) })
+                    );
+                  }
+                }
+              }
+            });
+          } else {
+            doc.descendants((childNode, pos) => {
+              if (childNode.isText && childNode.nodeSize) {
+                const someHasMark = childNode.marks.find(
+                  (mark) => mark.type === type
+                );
+                if (someHasMark) {
+                  let oldAttrs = JSON.parse(someHasMark.attrs.comment);
+                  if (Array.isArray(oldAttrs)) {
+                    let targetComment = oldAttrs.find((v) => v.uuid === uuid);
+                    if (targetComment) {
+                      targetComment.comments.push(comment);
+                      let trimmedFrom = pos;
+                      let trimmedTo = pos + childNode.nodeSize;
+                      tr.addMark(
+                        trimmedFrom,
+                        trimmedTo,
+                        type.create({ comment: JSON.stringify(oldAttrs) })
+                      );
+                    }
+                  }
+                }
+              }
+            });
+          }
+        };
+      },
+      deleteComment: ({ uuid, parentUuid = "" }) => {
+        return (params) => {
+          if (uuid) {
+            const {
+              tr,
+              state: { doc },
+              state,
+            } = params;
+
+            let type = getMarkType("comment", state.schema);
+            doc.descendants((childNode, pos) => {
+              if (childNode.isText && childNode.nodeSize) {
+                const someHasMark = childNode.marks.find(
+                  (mark) => mark.type === type
+                );
+                if (someHasMark) {
+                  let oldAttrs = JSON.parse(someHasMark.attrs.comment);
+                  if (Array.isArray(oldAttrs)) {
+                    let trimmedFrom = pos;
+                    let trimmedTo = pos + childNode.nodeSize;
+                    if (parentUuid) {
+                      let parentIndex = oldAttrs.findIndex(
+                        (v) => v.uuid === parentUuid
+                      );
+                      if (
+                        parentIndex !== -1 &&
+                        Array.isArray(oldAttrs[parentIndex].comments)
+                      ) {
+                        let targetComment = oldAttrs[parentIndex].comments;
+                        let index = targetComment.findIndex(
+                          (v) => v.uuid === uuid
+                        );
+
+                        if (index !== -1) {
+                          targetComment.splice(index, 1);
+                          if (targetComment.length === 0) {
+                            oldAttrs.splice(parentIndex, 1);
+                          }
+
+                          if (oldAttrs.length === 0) {
+                            tr.removeMark(trimmedFrom, trimmedTo, type);
+                          } else {
+                            tr.addMark(
+                              trimmedFrom,
+                              trimmedTo,
+                              type.create({ comment: JSON.stringify(oldAttrs) })
+                            );
+                          }
+                        }
+                      }
+                    } else {
+                      let index = oldAttrs.findIndex((v) => v.uuid === uuid);
+
+                      if (index !== -1) {
+                        oldAttrs.splice(index, 1);
+                        if (oldAttrs.length === 0) {
+                          tr.removeMark(trimmedFrom, trimmedTo, type);
+                        } else {
+                          tr.addMark(
+                            trimmedFrom,
+                            trimmedTo,
+                            type.create({ comment: JSON.stringify(oldAttrs) })
+                          );
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            });
+          }
+        };
+      },
       unsetComment:
         () =>
         ({ commands }) =>
