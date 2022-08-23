@@ -198,7 +198,7 @@ export default {
         ...this.extensions,
         UniqueID.configure({
           attributeName: "uid",
-          types: ["heading", "paragraph", "comment"],
+          types: ["heading", "paragraph"],
           filterTransaction: (transaction) => !isChangeOrigin(transaction),
         }),
         Collaboration.configure({
@@ -216,7 +216,7 @@ export default {
         }),
       ],
       autofocus: false,
-      editable: false,
+      editable: true,
       injectCSS: false,
       onUpdate: ({ editor }) => {
         this.setCurrentComment(editor);

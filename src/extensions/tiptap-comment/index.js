@@ -4,7 +4,7 @@ import {
   Mark,
   mergeAttributes,
 } from "@tiptap/vue-2";
-import { Plugin, TextSelection } from "prosemirror-state";
+import { Plugin, TextSelection, PluginKey } from "prosemirror-state";
 import { getMarkType } from "@tiptap/core";
 
 const Comment = Mark.create({
@@ -46,7 +46,7 @@ const Comment = Mark.create({
 
   addCommands() {
     return {
-      mergeComment: ({ comment, uuid, isAdd }) => {
+      mergeComment: ({ comment, uuid, isAdd = false }) => {
         return (params) => {
           const {
             tr,
@@ -194,10 +194,6 @@ const Comment = Mark.create({
           }
         };
       },
-      unsetComment:
-        () =>
-        ({ commands }) =>
-          commands.unsetMark("comment"),
     };
   },
 
@@ -206,6 +202,7 @@ const Comment = Mark.create({
 
     const plugins = [
       new Plugin({
+        key: new PluginKey('comment-click'),
         props: {
           handleClick(view, pos) {
             if (!extensionThis.options.isCommentModeOn()) return false;
@@ -230,6 +227,23 @@ const Comment = Mark.create({
           },
         },
       }),
+      new Plugin({
+        key: new PluginKey('comment-content'),
+        props: {
+          transformPasted: (slice) => {
+            slice.content.content.map(node => {
+               node.descendants((childNode) => {
+                let commentMarkIndex = childNode.marks.findIndex(v => v.type.name === 'comment')
+
+                if(commentMarkIndex !== -1) {
+                  childNode.marks.splice(commentMarkIndex, 1)
+                }
+               })
+            })
+            return slice
+          }
+        }
+      })
     ];
 
     return plugins;
