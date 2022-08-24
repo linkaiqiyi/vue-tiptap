@@ -7,6 +7,19 @@ import {
 import { Plugin, TextSelection, PluginKey } from "prosemirror-state";
 import { getMarkType } from "@tiptap/core";
 
+/** comment 数据结构
+  [
+    {
+      uuid,
+      comments: [
+        {
+          uuid, content, userName, time
+        }
+      ]
+    }
+  ]
+ */
+
 const Comment = Mark.create({
   name: "comment",
 
@@ -202,7 +215,7 @@ const Comment = Mark.create({
 
     const plugins = [
       new Plugin({
-        key: new PluginKey('comment-click'),
+        key: new PluginKey("comment-plugin"),
         props: {
           handleClick(view, pos) {
             if (!extensionThis.options.isCommentModeOn()) return false;
@@ -225,25 +238,22 @@ const Comment = Mark.create({
 
             return true;
           },
+          transformPasted: (slice) => {
+            slice.content.content.map((node) => {
+              node.descendants((childNode) => {
+                let commentMarkIndex = childNode.marks.findIndex(
+                  (v) => v.type.name === "comment"
+                );
+
+                if (commentMarkIndex !== -1) {
+                  childNode.marks.splice(commentMarkIndex, 1);
+                }
+              });
+            });
+            return slice;
+          },
         },
       }),
-      new Plugin({
-        key: new PluginKey('comment-content'),
-        props: {
-          transformPasted: (slice) => {
-            slice.content.content.map(node => {
-               node.descendants((childNode) => {
-                let commentMarkIndex = childNode.marks.findIndex(v => v.type.name === 'comment')
-
-                if(commentMarkIndex !== -1) {
-                  childNode.marks.splice(commentMarkIndex, 1)
-                }
-               })
-            })
-            return slice
-          }
-        }
-      })
     ];
 
     return plugins;
