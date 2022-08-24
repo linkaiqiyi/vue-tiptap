@@ -166,7 +166,7 @@ export default {
     });
 
     this.provider = new HocuspocusProvider({
-      url: "ws://10.2.128.251:4444",
+      url: "ws://127.0.0.1:4444",
       name: docName,
       document: ydoc,
       token: "super-secret-token",
