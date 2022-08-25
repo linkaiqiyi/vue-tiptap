@@ -10,57 +10,57 @@
       </button>
     </div>
 
-    <BubbleMenu
-      v-if="editor"
-      :editor="editor"
-      :should-show="
-        ({ editor }) =>
-          !editor.state.selection.empty || editor.isActive('comment')
-      "
-      class="bubble-menu"
-    >
-      <div style="margin-bottom: 10px; font-size: 10px">
-        <label
-          style="display: block"
-          v-for="item in activeCommentsInstance"
-          :key="item.uuid"
-        >
-          <input
-            type="radio"
-            v-model="selectedCommentUuid"
-            :value="item.uuid"
-          />
-          {{ item.uuid }}
-        </label>
-      </div>
-      <hr />
-      <textarea
-        v-model="commentText"
-        cols="30"
-        rows="4"
-        placeholder="Add new comment..."
-        @keypress.enter.stop.prevent="() => handleSetComment()"
-      />
-      <section class="flex justify-end gap-2">
-        <button @click="() => (commentText = '')">Clear</button>
-        <button @click="() => deleteComment()">Delete</button>
-        <button @click="() => handleSetComment()">
-          Add &nbsp; <kbd> ⏎ </kbd>
-        </button>
-      </section>
-    </BubbleMenu>
-
     <div style="display: flex">
       <div style="width: 500px">
         <editor-content class="editor-content" :editor="editor" />
       </div>
 
       <div id="format-json">
-        <pre
+        <div
+          v-if="editor"
+          :editor="editor"
+          :should-show="
+            ({ editor }) =>
+              !editor.state.selection.empty || editor.isActive('comment')
+          "
+          style="margin: 10px 0 0 50px"
+          class="bubble-menu"
+        >
+          <div style="font-size: 10px">
+            <label
+              style="display: block"
+              v-for="item in activeCommentsInstance"
+              :key="item.uuid"
+            >
+              <input
+                type="radio"
+                v-model="selectedCommentUuid"
+                :value="item.uuid"
+              />
+              {{ item.uuid }}
+            </label>
+          </div>
+          <hr />
+          <textarea
+            style="width: 100%"
+            v-model="commentText"
+            rows="4"
+            placeholder="Add new comment..."
+            @keypress.enter.stop.prevent="() => handleSetComment()"
+          />
+          <section class="flex justify-end gap-2">
+            <button @click="() => (commentText = '')">Clear</button>
+            <button @click="() => deleteComment()">Delete</button>
+            <button @click="() => handleSetComment()">
+              Add &nbsp; <kbd> ⏎ </kbd>
+            </button>
+          </section>
+        </div>
+        <pre v-html="syntaxHighlight(activeCommentsInstance || null)"></pre>
+        <!-- <pre
           style="height: 50%"
           v-html="syntaxHighlight(editor?.getJSON() || null)"
-        ></pre>
-        <pre v-html="syntaxHighlight(activeCommentsInstance || null)"></pre>
+        ></pre> -->
       </div>
     </div>
   </div>
@@ -68,7 +68,7 @@
 
 <script>
 // comment / 协作
-import { Editor, EditorContent, BubbleMenu } from "@tiptap/vue-2";
+import { Editor, EditorContent } from "@tiptap/vue-2";
 import StarterKit from "@tiptap/starter-kit";
 // import { findChildrenInRange } from "@tiptap/core";
 import Collaboration, { isChangeOrigin } from "@tiptap/extension-collaboration";
@@ -87,7 +87,7 @@ import { UniqueID, Comment, CustomCursor } from "../../extensions/index.js";
 export default {
   components: {
     EditorContent,
-    BubbleMenu,
+    // BubbleMenu,
   },
   data() {
     return {
@@ -101,6 +101,7 @@ export default {
         room: "",
         token: "",
       },
+      docName: "",
       extensions: [],
       commentText: "",
       selectedCommentUuid: "",
@@ -123,8 +124,15 @@ export default {
       StarterKit.configure({
         history: false,
       }),
+      UniqueID.configure({
+        attributeName: "uid",
+        types: ["heading", "paragraph"],
+        filterTransaction: (transaction) => !isChangeOrigin(transaction),
+      }),
       Comment,
+      CustomCursor,
     ];
+    this.docName = "default";
   },
   mounted() {
     let name, password, room, token;
@@ -148,7 +156,6 @@ export default {
     } catch (e) {
       console.log(e);
     }
-    const docName = "default";
 
     let transformer = TiptapTransformer;
     transformer.extensions(this.extensions);
@@ -156,7 +163,7 @@ export default {
     const ydoc = new Y.Doc();
     ydoc.transformer = transformer;
 
-    this.indexdbProvider = new IndexeddbPersistence(docName, ydoc);
+    this.indexdbProvider = new IndexeddbPersistence(this.docName, ydoc);
 
     this.indexdbProvider.on("synced", (_this) => {
       console.log(
@@ -167,10 +174,11 @@ export default {
 
     this.provider = new HocuspocusProvider({
       url: "ws://127.0.0.1:4444",
-      name: docName,
+      name: this.docName,
       document: ydoc,
       token: "super-secret-token",
       broadcast: false,
+      connect: false,
       parameters: this.userInfo,
       onAuthenticated() {
         console.log("auth success");
@@ -196,11 +204,6 @@ export default {
       },
       extensions: [
         ...this.extensions,
-        UniqueID.configure({
-          attributeName: "uid",
-          types: ["heading", "paragraph"],
-          filterTransaction: (transaction) => !isChangeOrigin(transaction),
-        }),
         Collaboration.configure({
           document: this.provider.document,
         }),
@@ -211,14 +214,13 @@ export default {
             color: "#f783ac",
           },
         }),
-        CustomCursor
       ],
       autofocus: false,
       editable: true,
       injectCSS: false,
-      onUpdate: ({ editor }) => {
-        this.setCurrentComment(editor);
-      },
+      // onUpdate: ({ editor }) => {
+      //   this.setCurrentComment(editor);
+      // },
       onSelectionUpdate: ({ editor }) => {
         this.setCurrentComment(editor);
         this.isTextSelected = !!editor.state.selection.content().size;
@@ -376,7 +378,6 @@ export default {
 <style scoped>
 .bubble-menu {
   border: 1px dashed gray;
-  backdrop-filter: blur(16px);
   padding: 8px;
   border-radius: 8px;
 }
@@ -414,10 +415,10 @@ export default {
   border-radius: 4px;
   cursor: pointer;
 }
-
+/* 
 .editor-content .ProseMirror::-webkit-scrollbar {
   display: none;
-}
+} */
 
 /* Give a remote user a caret */
 .collaboration-cursor__caret {
@@ -455,9 +456,9 @@ export default {
   overflow: scroll;
 }
 
-#format-json pre::-webkit-scrollbar {
+/* #format-json pre::-webkit-scrollbar {
   display: none;
-}
+} */
 
 .json-string {
   color: #c62628;
