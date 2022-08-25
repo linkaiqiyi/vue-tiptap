@@ -211,9 +211,7 @@ export default {
             color: "#f783ac",
           },
         }),
-        CustomCursor.configure({
-          className: "has-focus",
-        }),
+        CustomCursor
       ],
       autofocus: false,
       editable: true,
@@ -419,11 +417,6 @@ export default {
 
 .editor-content .ProseMirror::-webkit-scrollbar {
   display: none;
-}
-
-.has-focus {
-  border-radius: 3px;
-  box-shadow: 0 0 0 3px #68cef8;
 }
 
 /* Give a remote user a caret */
