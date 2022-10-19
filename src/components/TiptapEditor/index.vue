@@ -56,10 +56,10 @@
       </div>
 
       <div id="format-json">
-        <pre
+        <!-- <pre
           style="height: 50%"
           v-html="syntaxHighlight(editor?.getJSON() || null)"
-        ></pre>
+        ></pre> -->
         <pre v-html="syntaxHighlight(activeCommentsInstance || null)"></pre>
       </div>
     </div>
@@ -77,7 +77,7 @@ import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
 
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { TiptapTransformer } from "@hocuspocus/transformer";
-import { IndexeddbPersistence } from "y-indexeddb";
+// import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 
 import { uuidv4 } from "lib0/random.js";
@@ -148,7 +148,6 @@ export default {
     } catch (e) {
       console.log(e);
     }
-    const docName = "default";
 
     let transformer = TiptapTransformer;
     transformer.extensions(this.extensions);
@@ -156,18 +155,18 @@ export default {
     const ydoc = new Y.Doc();
     ydoc.transformer = transformer;
 
-    this.indexdbProvider = new IndexeddbPersistence(docName, ydoc);
+    // this.indexdbProvider = new IndexeddbPersistence(room, ydoc);
 
-    this.indexdbProvider.on("synced", (_this) => {
-      console.log(
-        "content from the database is loaded",
-        transformer.fromYdoc(_this.doc)
-      );
-    });
+    // this.indexdbProvider.on("synced", (_this) => {
+    //   console.log(
+    //     "content from the database is loaded",
+    //     transformer.fromYdoc(_this.doc)
+    //   );
+    // });
 
     this.provider = new HocuspocusProvider({
       url: "ws://127.0.0.1:4444",
-      name: docName,
+      name: room || 'default',
       document: ydoc,
       token: "super-secret-token",
       broadcast: false,
@@ -231,14 +230,14 @@ export default {
     });
 
     window.editorInstance = this.editor;
-    window.indexedDBProvide = this.indexdbProvider;
+    // window.indexedDBProvide = this.indexdbProvider;
     window.ydoc = ydoc;
     window.deleteComment = this.deleteComment;
   },
   beforeDestroy() {
     this.editor && this.editor.destroy();
     this.provider && this.provider.destroy();
-    this.indexdbProvider && this.indexdbProvider.destroy();
+    // this.indexdbProvider && this.indexdbProvider.destroy();
   },
   methods: {
     findCommentsAndStoreValues(editorInstance) {
