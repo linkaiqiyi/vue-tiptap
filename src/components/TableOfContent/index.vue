@@ -18,12 +18,14 @@
       </ul>
     </div>
     <div style="position: absolute; bottom: 0; line-height: 30px">
-      字数 {{ docTotalSize }}
+      字数: {{ docTotalSize }}
     </div>
   </div>
 </template>
 
 <script>
+import { uuidv4 } from "lib0/random.js";
+
 export default {
   props: {
     editor: {
@@ -39,7 +41,7 @@ export default {
   },
   computed: {
     docTotalSize() {
-      return this.editor.state.doc.nodeSize;
+      return this.editor?.state.doc.textContent?.length || 0;
     },
   },
 
@@ -51,7 +53,7 @@ export default {
       this.editor.state.doc.descendants((node, pos) => {
         let nodeTypeName = node.type.name;
         if (nodeTypeName === "act" || nodeTypeName === "scenehead") {
-          const id = `${nodeTypeName}-${headings.length + 1}`;
+          const id = uuidv4();
 
           if (node.attrs.id !== id) {
             transaction.setNodeMarkup(pos, undefined, {
