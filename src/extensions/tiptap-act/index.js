@@ -17,7 +17,7 @@ const Act = Node.create({
   group: "block",
   defining: true,
   parseHTML() {
-    return [{ tag: "p" }];
+    return [{ tag: "p[act]" }];
   },
   renderHTML({ HTMLAttributes }) {
     return [

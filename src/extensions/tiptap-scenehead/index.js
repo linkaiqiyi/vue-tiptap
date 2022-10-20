@@ -17,7 +17,7 @@ const Scenehead = Node.create({
   group: "block",
   defining: true,
   parseHTML() {
-    return [{ tag: "p" }];
+    return [{ tag: "p[data-scenehead]" }];
   },
   renderHTML({ HTMLAttributes }) {
     return [

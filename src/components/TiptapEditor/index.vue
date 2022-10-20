@@ -206,7 +206,7 @@ export default {
         ...this.extensions,
         UniqueID.configure({
           attributeName: "uid",
-          types: ["heading", "paragraph"],
+          types: ["heading", "paragraph", 'scenehead', 'act'],
           filterTransaction: (transaction) => !isChangeOrigin(transaction),
         }),
         Collaboration.configure({

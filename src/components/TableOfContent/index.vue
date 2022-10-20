@@ -84,6 +84,7 @@ export default {
     },
     handleSelectionUpdate(event) {
       const { transaction } = event;
+      if (transaction.curSelectionFor) return // 避免渲染完成之后会目录跳转到最底部
       let head = transaction.curSelection.head;
       let prevHeading = this.headings
         .slice()
@@ -104,7 +105,7 @@ export default {
 
   mounted() {
     this.editor.on("update", this.handleUpdate);
-    this.editor.on("selectionUpdate", this.handleSelectionUpdate);
+    // this.editor.on("selectionUpdate", this.handleSelectionUpdate);
     this.$nextTick(this.handleUpdate);
   },
 };
