@@ -1,6 +1,6 @@
 <template>
   <div class="container">
-    <div class="options">
+    <div class="options" style="margin-left: 300px;">
       <button @click="() => editor?.setEditable(!editor?.isEditable)">
         editable: {{ editor?.isEditable }}
       </button>
@@ -8,6 +8,7 @@
       <button @click="() => editor.chain().toggleHeading({ level: 3 }).run()">
         head
       </button>
+      <button @click="() => editor.chain().toggleAct().run()">act</button>
     </div>
 
     <BubbleMenu
@@ -51,6 +52,9 @@
     </BubbleMenu>
 
     <div style="display: flex">
+      <div style="width: 300px">
+        <TableOfContent v-if="editor" :editor="editor" />
+      </div>
       <div style="width: 500px">
         <editor-content class="editor-content" :editor="editor" />
       </div>
@@ -82,12 +86,15 @@ import * as Y from "yjs";
 
 import { uuidv4 } from "lib0/random.js";
 
-import { UniqueID, Comment, CustomCursor } from "../../extensions/index.js";
+import { UniqueID, Comment, CustomCursor, Scenehead, Act } from "../../extensions/index.js";
+
+import TableOfContent from '../TableOfContent/index.vue'
 
 export default {
   components: {
     EditorContent,
     BubbleMenu,
+    TableOfContent
   },
   data() {
     return {
@@ -123,7 +130,9 @@ export default {
       StarterKit.configure({
         history: false,
       }),
-      Comment,
+      Comment.configure({
+        isCommentModeOn: () => true
+      }),
     ];
   },
   mounted() {
@@ -172,16 +181,16 @@ export default {
       broadcast: false,
       parameters: this.userInfo,
       onAuthenticated() {
-        console.log("auth success");
+        // console.log("auth success");
       },
       onAuthenticationFailed(params) {
         console.log("auth failed", params);
       },
       onConnect() {
-        console.log("connect");
+        // console.log("connect");
       },
       onDisconnect() {
-        console.log("disconnect");
+        // console.log("disconnect");
         this.provider && this.provider.destroy();
       },
     });
@@ -213,6 +222,8 @@ export default {
         CustomCursor.configure({
           className: "has-focus",
         }),
+        Scenehead,
+        Act,
       ],
       autofocus: false,
       editable: true,
@@ -414,6 +425,15 @@ export default {
   padding: 0 2px 0 2px;
   border-radius: 4px;
   cursor: pointer;
+}
+.editor-content .ProseMirror p[data-scenehead] {
+  background: rgba(123, 123, 116, 0.335);
+  font-weight: 600;
+}
+.editor-content .ProseMirror p[data-act] {
+  font-size: 18px;
+  font-weight: 600;
+  padding: 8px 0;
 }
 
 .editor-content .ProseMirror::-webkit-scrollbar {
