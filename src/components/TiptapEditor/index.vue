@@ -8,6 +8,7 @@
       <button @click="() => editor.chain().toggleHeading({ level: 3 }).run()">
         head
       </button>
+      <button @click="() => editor.chain().toggleDataType('act').run()">act</button>
     </div>
 
     <BubbleMenu
@@ -82,7 +83,7 @@ import * as Y from "yjs";
 
 import { uuidv4 } from "lib0/random.js";
 
-import { UniqueID, Comment, CustomCursor } from "../../extensions/index.js";
+import { UniqueID, Comment, CustomCursor,/* Scenehead, Act*/SceneheadOrAct } from "../../extensions/index.js";
 
 export default {
   components: {
@@ -172,16 +173,16 @@ export default {
       broadcast: false,
       parameters: this.userInfo,
       onAuthenticated() {
-        console.log("auth success");
+        // console.log("auth success");
       },
       onAuthenticationFailed(params) {
         console.log("auth failed", params);
       },
       onConnect() {
-        console.log("connect");
+        // console.log("connect");
       },
       onDisconnect() {
-        console.log("disconnect");
+        // console.log("disconnect");
         this.provider && this.provider.destroy();
       },
     });
@@ -197,7 +198,7 @@ export default {
         ...this.extensions,
         UniqueID.configure({
           attributeName: "uid",
-          types: ["heading", "paragraph"],
+          types: ["heading", "paragraph", 'scenehead', 'act'],
           filterTransaction: (transaction) => !isChangeOrigin(transaction),
         }),
         Collaboration.configure({
@@ -213,8 +214,13 @@ export default {
         CustomCursor.configure({
           className: "has-focus",
         }),
+        // Scenehead,
+        // Act
+        SceneheadOrAct.configure({
+          editor: () => this.editor
+        })
       ],
-      autofocus: false,
+      autofocus: "all",
       editable: true,
       injectCSS: false,
       onUpdate: ({ editor }) => {
@@ -414,6 +420,15 @@ export default {
   padding: 0 2px 0 2px;
   border-radius: 4px;
   cursor: pointer;
+}
+.editor-content .ProseMirror p[data-type="scenehead"] {
+  background: rgba(123, 123, 116, 0.335);
+  font-weight: 600;
+}
+.editor-content .ProseMirror p[data-type="act"] {
+  font-size: 18px;
+  font-weight: 600;
+  padding: 8px 0;
 }
 
 .editor-content .ProseMirror::-webkit-scrollbar {
