@@ -52,6 +52,9 @@
     </BubbleMenu>
 
     <div style="display: flex">
+      <div style="width: 300px">
+        <TableOfContent :editor="editor" v-if="editor" />
+      </div>
       <div style="width: 500px">
         <editor-content class="editor-content" :editor="editor" />
       </div>
@@ -85,10 +88,13 @@ import { uuidv4 } from "lib0/random.js";
 
 import { UniqueID, Comment, CustomCursor,/* Scenehead, Act*/SceneheadOrAct } from "../../extensions/index.js";
 
+import TableOfContent from '../TableOfContent/index.vue'
+
 export default {
   components: {
     EditorContent,
     BubbleMenu,
+    TableOfContent
   },
   data() {
     return {
@@ -220,7 +226,7 @@ export default {
           editor: () => this.editor
         })
       ],
-      autofocus: "all",
+      // autofocus: "start",
       editable: true,
       injectCSS: false,
       onUpdate: ({ editor }) => {

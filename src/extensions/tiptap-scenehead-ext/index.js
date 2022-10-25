@@ -8,7 +8,7 @@ const SceneheadOrAct = Extension.create({
   addOptions() {
     return {
       types: ["paragraph"],
-      attrs: ["scenehead", "act", ""],
+      attrs: ["scenehead", "act"],
       editor: () => null,
       storageTimer: null,
     };
@@ -19,12 +19,12 @@ const SceneheadOrAct = Extension.create({
         types: this.options.types,
         attributes: {
           dataType: {
-            default: "",
+            // default: "",
             parseHTML: (element) => {
               if (element && element.attrs) {
                 return element.attrs["data-type"];
               }
-              return "";
+              // return "";
             },
             renderHTML: (attributes) => {
               if (!attributes) return {};
@@ -134,8 +134,9 @@ const SceneheadOrAct = Extension.create({
   addStorage() {
     return new Map();
   },
-  onUpdate() {
-    this.options.editor().commands.updateTableOfContent();
+  onUpdate({ editor }) {
+    editor.commands.updateTableOfContent();
+    // console.log(this.storage);
   },
   onDestroy() {
     this.storage.clear();
