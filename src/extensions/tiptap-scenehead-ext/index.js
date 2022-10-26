@@ -5,7 +5,7 @@ const SceneheadOrAct = Extension.create({
   addOptions() {
     return {
       types: ["paragraph"],
-      attrs: ["scenehead", "act"]
+      attrs: ["scenehead", "act"],
     };
   },
   addGlobalAttributes() {
@@ -14,11 +14,9 @@ const SceneheadOrAct = Extension.create({
         types: this.options.types,
         attributes: {
           dataType: {
-            parseHTML: (element) => {
-              if (element && element.attrs) {
-                return element.attrs["data-type"];
-              }
-            },
+            parseHTML: (element) =>
+              element?.attrs?.["dataType"] ??
+              (element?.getAttribute("data-type") || null),
             renderHTML: (attributes) => {
               if (
                 !attributes ||
@@ -27,7 +25,6 @@ const SceneheadOrAct = Extension.create({
               ) {
                 return {};
               }
-
               return { "data-type": attributes.dataType };
             },
           },
@@ -60,14 +57,14 @@ const SceneheadOrAct = Extension.create({
           } else {
             return commands.setDataType(attributes);
           }
-        }
+        },
     };
   },
   addKeyboardShortcuts() {
     return {
       // Tab: () => this.editor.commands.toggleDataType("scenehead"), // 通过对 dom 进行监听事件实现 (不能编辑的时候该方法失效)
     };
-  }
+  },
 });
 
 export { SceneheadOrAct, SceneheadOrAct as default };
