@@ -8,7 +8,9 @@
       <button @click="() => editor.chain().toggleHeading({ level: 3 }).run()">
         head
       </button>
-      <button @click="() => editor.chain().toggleDataType('act').run()">act</button>
+      <button @click="() => editor.chain().toggleDataType('act').run()">
+        act
+      </button>
     </div>
 
     <BubbleMenu
@@ -20,7 +22,8 @@
       "
       class="bubble-menu"
     >
-      <div style="margin-bottom: 10px; font-size: 10px">
+      批注
+      <!-- <div style="margin-bottom: 10px; font-size: 10px">
         <label
           style="display: block"
           v-for="item in activeCommentsInstance"
@@ -48,7 +51,7 @@
         <button @click="() => handleSetComment()">
           Add &nbsp; <kbd> ⏎ </kbd>
         </button>
-      </section>
+      </section> -->
     </BubbleMenu>
 
     <div style="display: flex">
@@ -56,7 +59,7 @@
         <TableOfContent :editor="editor" v-if="editor" />
       </div>
       <div style="width: 500px">
-        <editor-content class="editor-content" :editor="editor" />
+        <editor-content class="editor-content" tabindex="0" :editor="editor" />
       </div>
 
       <div id="format-json">
@@ -86,15 +89,20 @@ import * as Y from "yjs";
 
 import { uuidv4 } from "lib0/random.js";
 
-import { UniqueID, Comment, CustomCursor,/* Scenehead, Act*/SceneheadOrAct } from "../../extensions/index.js";
+import {
+  UniqueID,
+  Comment,
+  CustomCursor,
+  /* Scenehead, Act*/ SceneheadOrAct,
+} from "../../extensions/index.js";
 
-import TableOfContent from '../TableOfContent/index.vue'
+import TableOfContent from "../TableOfContent/index.vue";
 
 export default {
   components: {
     EditorContent,
     BubbleMenu,
-    TableOfContent
+    TableOfContent,
   },
   data() {
     return {
@@ -173,7 +181,7 @@ export default {
 
     this.provider = new HocuspocusProvider({
       url: "ws://127.0.0.1:4444",
-      name: room || 'default',
+      name: room || "default",
       document: ydoc,
       token: "super-secret-token",
       broadcast: false,
@@ -204,7 +212,7 @@ export default {
         ...this.extensions,
         UniqueID.configure({
           attributeName: "uid",
-          types: ["heading", "paragraph", 'scenehead', 'act'],
+          types: ["heading", "paragraph"],
           filterTransaction: (transaction) => !isChangeOrigin(transaction),
         }),
         Collaboration.configure({
@@ -220,14 +228,10 @@ export default {
         CustomCursor.configure({
           className: "has-focus",
         }),
-        // Scenehead,
-        // Act
-        SceneheadOrAct.configure({
-          editor: () => this.editor
-        })
+        SceneheadOrAct
       ],
       // autofocus: "start",
-      editable: true,
+      editable: false,
       injectCSS: false,
       onUpdate: ({ editor }) => {
         this.setCurrentComment(editor);
@@ -236,9 +240,16 @@ export default {
         this.setCurrentComment(editor);
         this.isTextSelected = !!editor.state.selection.content().size;
       },
-      // onCreate: ({ editor }) => {
-      //   this.findCommentsAndStoreValues(editor);
-      // },
+    });
+
+    this.$nextTick(() => {
+      // dom 上需要加 tabindex 才能被选中
+      document.querySelector('.editor-content').addEventListener('keydown', (event) => {
+        if (event.code === 'Tab') {
+          this.editor.commands.toggleDataType('scenehead')
+          event.preventDefault()
+        }
+      })
     });
 
     window.editorInstance = this.editor;
@@ -388,10 +399,13 @@ export default {
 
 <style scoped>
 .bubble-menu {
-  border: 1px dashed gray;
-  backdrop-filter: blur(16px);
-  padding: 8px;
-  border-radius: 8px;
+  /* border: 1px dashed gray;
+  backdrop-filter: blur(16px); */
+  padding: 4px 6px;
+  /* border-radius: 8px; */
+  background-color: #fff;
+  border: 1px solid #000;
+  cursor: pointer;
 }
 </style>
 
@@ -408,6 +422,9 @@ export default {
 }
 .editor-content {
   width: 100%;
+}
+.editor-content:focus-visible {
+  outline: none;
 }
 .editor-content .ProseMirror {
   border: 1px solid #000;

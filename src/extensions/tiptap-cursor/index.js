@@ -28,7 +28,7 @@ const CustomCursor = Extension.create({
             const { isEditable } = this.editor;
             const [tr, , , newState] = params;
             let from = tr.curSelection.from;
-            // 不能编辑 ｜ 鼠标时间 ｜ 选择范围为空
+            // 不能编辑 ｜ 鼠标事件 ｜ 选择范围为空
             if (!isEditable && tr.meta.pointer && newState.selection.empty) {
               return DecorationSet.create(newState.doc, [
                 Decoration.widget(from, () => createCursor(), { side: 100 }),

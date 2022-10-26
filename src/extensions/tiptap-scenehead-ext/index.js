@@ -65,7 +65,7 @@ const SceneheadOrAct = Extension.create({
   },
   addKeyboardShortcuts() {
     return {
-      Tab: () => this.editor.commands.toggleDataType("scenehead"),
+      // Tab: () => this.editor.commands.toggleDataType("scenehead"), // 通过对 dom 进行监听事件实现 (不能编辑的时候该方法失效)
     };
   }
 });
