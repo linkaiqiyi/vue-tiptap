@@ -93,7 +93,8 @@ import {
   UniqueID,
   Comment,
   CustomCursor,
-  /* Scenehead, Act*/ SceneheadOrAct,
+  CustomParagraph,
+  SceneheadOrAct,
 } from "../../extensions/index.js";
 
 import TableOfContent from "../TableOfContent/index.vue";
@@ -137,8 +138,10 @@ export default {
     this.extensions = [
       StarterKit.configure({
         history: false,
+        paragraph: false
       }),
       Comment,
+      CustomParagraph,
     ];
   },
   mounted() {
@@ -228,10 +231,10 @@ export default {
         CustomCursor.configure({
           className: "has-focus",
         }),
-        SceneheadOrAct
+        SceneheadOrAct,
       ],
       // autofocus: "start",
-      editable: false,
+      editable: true,
       injectCSS: false,
       onUpdate: ({ editor }) => {
         this.setCurrentComment(editor);
@@ -244,12 +247,14 @@ export default {
 
     this.$nextTick(() => {
       // dom 上需要加 tabindex 才能被选中
-      document.querySelector('.editor-content').addEventListener('keydown', (event) => {
-        if (event.code === 'Tab') {
-          this.editor.commands.toggleDataType('scenehead')
-          event.preventDefault()
-        }
-      })
+      document
+        .querySelector(".editor-content")
+        .addEventListener("keydown", (event) => {
+          if (event.code === "Tab") {
+            this.editor.commands.toggleDataType("scenehead");
+            event.preventDefault();
+          }
+        });
     });
 
     window.editorInstance = this.editor;
