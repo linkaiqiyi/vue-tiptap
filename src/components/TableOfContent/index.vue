@@ -6,9 +6,12 @@
           :class="`toc_item toc_item--${item.uid} toc_item--${item.type}`"
           v-for="item in tocList"
           :key="item.uid"
-          @click="handleClick(item.uid, item.type)"
+          @click="handleClick(item.uid, item.type, item)"
         >
-          <span class="toc_item--content">{{ item.content }}</span>
+          <span class="toc_item--content"
+            >{{ item.sceneInfo.desc }} <br />
+            {{ item.content }}</span
+          >
           <span class="toc_item--count">{{ item.count }}</span>
         </div>
       </div>
@@ -18,6 +21,7 @@
 </template>
 
 <script>
+import { formatToObject, formatToString } from "@/utils/index";
 export default {
   props: {
     editor: {
@@ -52,10 +56,13 @@ export default {
     this.tocList = null;
   },
   methods: {
-    handleClick(uid, type) {
-      this.editorView
-        ?.querySelector(`p[data-type="${type}"][data-uid="${uid}"]`)
-        ?.scrollIntoViewIfNeeded();
+    handleClick(uid, type, tocItem) {
+      this.handleScrollIntoView(
+        this.editorView?.querySelector(
+          `p[data-type="${type}"][data-uid="${uid}"]`
+        ),
+        tocItem
+      );
     },
     handleUpdateToc() {
       const editor = this.editor;
@@ -70,21 +77,26 @@ export default {
         };
         this.version++;
         editor.state.doc.descendants((node, pos) => {
-          let { dataType, uid } = node.attrs;
+          let { dataType, uid, dataSceneInfo } = node.attrs;
+          dataSceneInfo = formatToObject(dataSceneInfo);
           if (dataType && this.attrs.includes(dataType)) {
             infos[dataType] = this.storage.get(uid);
             if (infos[dataType]) {
               infos[dataType].type = dataType;
+              infos[dataType].sceneInfo = dataSceneInfo;
               infos[dataType].pos = pos;
+              infos[dataType].node = node;
               infos[dataType].content = node.textContent;
               infos[dataType].count = 0;
               infos[dataType].version = this.version;
             } else {
               this.storage.set(uid, {
                 pos,
+                node,
                 content: node.textContent,
                 count: 0,
                 type: dataType,
+                sceneInfo: dataSceneInfo,
                 version: this.version,
               });
               infos[dataType] = this.storage.get(uid);
@@ -108,14 +120,41 @@ export default {
       const { transaction } = event;
       let pos = transaction.curSelection.from;
       let prevTocItem = this.tocList
-        .slice()
+        ?.slice()
         .reverse()
         .find((item) => item.pos <= pos);
       if (prevTocItem) {
-        this.$el
-          .querySelector(`.toc_item--${prevTocItem.uid}`)
-          ?.scrollIntoViewIfNeeded();
+        this.handleScrollIntoView(
+          this.$el.querySelector(`.toc_item--${prevTocItem.uid}`),
+          prevTocItem
+        );
       }
+    },
+    handleScrollIntoView(element) {
+      element?.scrollIntoViewIfNeeded();
+      // tr.setNodeMarkup(pos, undefined, {
+      //     ...this.node.attrs,
+      //     ...attributes,
+      // });
+      // this.handleModifySceneInfo(tocItem.uid, { desc: "新增描述" });
+    },
+    handleModifySceneInfo(uid, attribute) {
+      const tr = this.editor.state.tr;
+      const {node, pos} = this.storage.get(uid) ?? {};
+      if (!node) return;
+      const attributes = {
+        dataSceneInfo: formatToString(
+          Object.assign(
+            formatToObject(node.attrs.dataSceneInfo),
+            formatToObject(attribute)
+          )
+        ),
+      };
+      tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        ...attributes,
+      });
+      this.editor.view.dispatch(tr);
     },
     getTocList() {
       let tocMap = this.storage;
@@ -153,6 +192,7 @@ $--bottom-count-height: 36px;
         margin: 4px 0;
         display: flex;
         justify-content: space-between;
+        align-items: center;
         cursor: pointer;
         &.toc_item--scenehead {
           background-color: rgba(123, 123, 116, 0.335);

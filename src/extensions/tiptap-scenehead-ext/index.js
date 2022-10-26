@@ -1,4 +1,5 @@
 import { Extension } from "@tiptap/core";
+import {formatToString} from '@/utils/index'
 
 const SceneheadOrAct = Extension.create({
   name: "scenehead-act",
@@ -28,6 +29,21 @@ const SceneheadOrAct = Extension.create({
               return { "data-type": attributes.dataType };
             },
           },
+          dataSceneInfo: {
+            parseHTML: (element) =>
+              element?.attrs?.["dataSceneInfo"] ??
+              (element?.getAttribute("data-scene-info") || null),
+              renderHTML: (attributes) => {
+                if (
+                  !attributes ||
+                  !attributes.dataType ||
+                  !this.options.attrs.includes(attributes.dataType)
+                ) {
+                  return {};
+                }
+                return { "data-scene-info": formatToString(attributes.dataSceneInfo) };
+              },
+          }
         },
       },
     ];
@@ -42,12 +58,15 @@ const SceneheadOrAct = Extension.create({
           }
           return commands.updateAttributes("paragraph", {
             dataType: attributes,
+            dataSceneInfo: {
+              desc: '暂无描述'
+            }
           });
         },
       unsetDataType:
         () =>
         ({ commands }) => {
-          return commands.resetAttributes("paragraph", "dataType");
+          return commands.resetAttributes("paragraph", ["dataType", 'dataSceneInfo']);
         },
       toggleDataType:
         (attributes) =>

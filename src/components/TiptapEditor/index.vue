@@ -206,7 +206,9 @@ export default {
 
     this.editor = new Editor({
       editorProps: {
-        attributes: {},
+        attributes: {
+          class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none'
+        },
       },
       parseOptions: {
         preserveWhitespace: "full",
@@ -234,7 +236,7 @@ export default {
         SceneheadOrAct,
       ],
       // autofocus: "start",
-      editable: true,
+      editable: false,
       injectCSS: false,
       onUpdate: ({ editor }) => {
         this.setCurrentComment(editor);

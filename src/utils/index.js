@@ -1,4 +1,4 @@
-export function debounce(fn, delay) {
+export const debounce = (fn, delay) => {
     var timer = null // 声明计时器
     return function () {
         var context = this
@@ -10,7 +10,7 @@ export function debounce(fn, delay) {
     }
 }
 
-export function throttle(fn, wait) {
+export const throttle = (fn, wait) => {
     let pre = Date.now()
     return function () {
         let context = this;
@@ -22,4 +22,17 @@ export function throttle(fn, wait) {
         }
     }
 }
+
+// 将 data 格式化 为 string 类型
+export const formatToString = data => {
+    if (typeof data === 'object') return JSON.stringify(data)
+    return data.toString()
+}
+
+// 将 data 格式化 为 object 类型
+export const formatToObject = data => {
+    if (typeof data === 'string') return JSON.parse(data)
+    return data
+}
+
 
