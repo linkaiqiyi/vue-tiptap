@@ -23,7 +23,7 @@
       class="bubble-menu"
     >
       批注
-      <!-- <div style="margin-bottom: 10px; font-size: 10px">
+      <div style="margin-bottom: 10px; font-size: 10px">
         <label
           style="display: block"
           v-for="item in activeCommentsInstance"
@@ -51,7 +51,7 @@
         <button @click="() => handleSetComment()">
           Add &nbsp; <kbd> ⏎ </kbd>
         </button>
-      </section> -->
+      </section>
     </BubbleMenu>
 
     <div style="display: flex">
@@ -77,7 +77,7 @@
 // comment / 协作
 import { Editor, EditorContent, BubbleMenu } from "@tiptap/vue-2";
 import StarterKit from "@tiptap/starter-kit";
-// import { findChildrenInRange } from "@tiptap/core";
+import { findChildrenInRange } from "@tiptap/core";
 import Collaboration, { isChangeOrigin } from "@tiptap/extension-collaboration";
 import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
 // import Focus from "@tiptap/extension-focus";
@@ -138,7 +138,7 @@ export default {
     this.extensions = [
       StarterKit.configure({
         history: false,
-        paragraph: false
+        paragraph: false,
       }),
       Comment,
       CustomParagraph,
@@ -323,7 +323,22 @@ export default {
       this.editor.chain().deleteComment({ uuid, parentUuid }).run();
     },
     handleSetComment() {
+      console.log(this.getPrevCommentPos());
       this.setComment();
+    },
+    getPrevCommentPos() {
+      // 找到当前批注节点的前一个批注节点
+      const state = this.editor.state
+      let doc = state.doc;
+      let range = {
+        from: 0,
+        to: state.selection.from,
+      };
+      let result = findChildrenInRange(doc, range, (node) => {
+        return node.marks.some((mark) => mark.type.name === "comment");
+      });
+
+      return result?.pop()?.pos ?? 0;
     },
     /**
      * 在这个方法中不考虑如何进行 comment 的添加和合并
