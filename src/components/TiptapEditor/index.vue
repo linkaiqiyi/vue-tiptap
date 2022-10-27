@@ -145,7 +145,7 @@ export default {
     ];
   },
   mounted() {
-    let name, password, room, token;
+    let name, password, room, token, port;
 
     try {
       let search = {};
@@ -156,12 +156,13 @@ export default {
           let a = item.split("=");
           search[a[0]] = a[1];
         });
-      ({ name, password, room, token } = search);
+      ({ name, password, room, token, port } = search);
       this.userInfo = {
         name,
         password,
         room,
         token,
+        port
       };
     } catch (e) {
       console.log(e);
@@ -182,8 +183,12 @@ export default {
     //   );
     // });
 
+    port = port ?? 4444
+
+    console.log(port);
+
     this.provider = new HocuspocusProvider({
-      url: "ws://127.0.0.1:4444",
+      url: "ws://127.0.0.1:" + port,
       name: room || "default",
       document: ydoc,
       token: "super-secret-token",
